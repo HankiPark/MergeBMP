@@ -25,4 +25,6 @@
 <img src="/4.bmp" width="200px" height="150px" title="4.bmp" alt="4.bmp"></img>
    
 =>
+
+
 <img src="/result.bmp" width="400px" height="300px" title="result.bmp" alt="result.bmp"></img>
