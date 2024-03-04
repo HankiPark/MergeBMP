@@ -18,13 +18,17 @@ typedef struct tagBITMAPDATASIZE {
 	int direction;
 }BITMAPDATASIZE;
 
+
 void MergeFourBitmapFile(const char* inputFileName1, const char* inputFileName2, const char* inputFileName3,
 	const char* inputFileName4, const char* outputFileName);
 //비트맵을 읽어와서 bmp파일 data의 포인터를 리턴
 BYTE* LoadBitmapFile(BITMAPHEADER* bitmapHeader, BITMAPDATASIZE* imgSize, const char* fileName);
 //비트맵 파일을 쓰기
 void WriteBitmapFile(BITMAPHEADER outputHeader, BYTE* output, BITMAPDATASIZE imgSize, const char* fileName);
-
+//파일이름 설정
+char* SetInputFileName(char* word);
+//파일 width, height 비교
+int SizeComparison(BITMAPDATASIZE* firstSize, BITMAPDATASIZE* secondSize, BITMAPDATASIZE* thirdSize, BITMAPDATASIZE* fourthSize)
 
 
 void MergeFourBitmapFile(const char* inputFileName1, const char* inputFileName2, const char* inputFileName3,
@@ -37,6 +41,8 @@ void MergeFourBitmapFile(const char* inputFileName1, const char* inputFileName2,
 	BITMAPDATASIZE firstSize, secondSize, thirdSize, fourthSize;	
 	//output bmp파일의 크기를 저장할 변수
 	BITMAPDATASIZE outputSize;		
+
+
 
 	//비트맵파일을 읽어 이미지 정보(header, data)를 저장
 	BYTE* image = LoadBitmapFile(&firstHeader, &firstSize, inputFileName1);
@@ -56,6 +62,15 @@ void MergeFourBitmapFile(const char* inputFileName1, const char* inputFileName2,
 		return ;
 	}
 	
+	if (SizeComparison(&firstSize, &secondSize, &thirdSize, &fourthSize) == 0) {
+		printf("The file size are different. \n");
+		free(image);
+		free(image2);
+		free(image3);
+		free(image4);
+		return;
+	}
+
 	// header 정보 수정
 	outputHeader = firstHeader;
 	// row direction이 Top - Bottom 일 경우 header에 저장되어 있는 height이 음수이기에 양수로 바꿔줌
@@ -104,7 +119,7 @@ void MergeFourBitmapFile(const char* inputFileName1, const char* inputFileName2,
 	}
 
 	//bmp 파일 생성
-	WriteBitmapFile(outputHeader, outputs, outputSize, "result.bmp");
+	WriteBitmapFile(outputHeader, outputs, outputSize, outputFileName);
 
 	//메모리 해제
 	free(image);
@@ -116,6 +131,20 @@ void MergeFourBitmapFile(const char* inputFileName1, const char* inputFileName2,
 	return ;
 }
 
+int SizeComparison(BITMAPDATASIZE* firstSize, BITMAPDATASIZE* secondSize, BITMAPDATASIZE* thirdSize, BITMAPDATASIZE* fourthSize) {
+
+	if (firstSize->width != secondSize->width || firstSize->width != thirdSize->width || firstSize->width != fourthSize->width) {
+		printf("The widths of the four files are not the same. \n");
+		return 0;
+	}
+	if (firstSize->height != secondSize->height || firstSize->height != thirdSize->height || firstSize->height != fourthSize->height) {
+		printf("The heights of the four files are not the same. \n");
+		return 0;
+	}
+
+
+	return 1;
+}
 
 BYTE* LoadBitmapFile(BITMAPHEADER* bitmapHeader, BITMAPDATASIZE* imgSize, const char* fileName)
 {
@@ -135,32 +164,22 @@ BYTE* LoadBitmapFile(BITMAPHEADER* bitmapHeader, BITMAPDATASIZE* imgSize, const 
 			return NULL;
 		}
 
-		//문제의 조건인 24bit , width : 400, height : 300 검사
+		// row direction이 top - bottom 일 경우 height가 음수가 되기 때문에 방향 값 지정
+		if (bitmapHeader->bi.biHeight < 0) {
+			printf("%s's row direction is Top - Bottom \n", fileName);
+			imgSize->direction = 0;
+		} else {
+			imgSize->direction = bitmapHeader->bi.biHeight - 1;
+		}
+
+		// bitcount가 24인지 검사
 		if (bitmapHeader->bi.biBitCount != 24) {
 			printf("%s's bitcount is not 24 \n", fileName);
 			fclose(fp);
 			return NULL;
 		}
-		if (bitmapHeader->bi.biWidth != 400) {
-			printf("%s's width is not 400 pixel \n", fileName);
-			fclose(fp);
-			return NULL;
-		}
-		// 높이가 300이 아닐 경우에 높이 값이 -300 인지 검사
-		// row direction이 top - bottom 일 경우 height가 음수가 되기 때문
-		if (bitmapHeader->bi.biHeight != 300) {
-			if (bitmapHeader->bi.biHeight == -300) {
-				printf("%s's row direction is Top - Bottom \n", fileName);
-				imgSize->direction = 0;
-			} else {
-				printf("%s's height is not 300 pixel \n", fileName);
-				fclose(fp);
-				return NULL;
-			}
-		} else {
-			// row direction이 bottom - top (default)
-			imgSize->direction = bitmapHeader->bi.biHeight - 1;
-		}
+
+
 
 		//BITMAPDATASIZE에 관련 요소 저장
 		size = bitmapHeader->bi.biSizeImage;
@@ -211,13 +230,36 @@ void WriteBitmapFile(BITMAPHEADER outputHeader, BYTE* output, BITMAPDATASIZE img
 	fclose(fp);
 }
 
+char* SetFileName(char* word) {
+	char temp[255];
+	char* p;
+
+	printf("\nPlease enter the \"%s\" file name or full path (max length : 255)\n ", word);
+	printf("Note\n \t1.skip file extension (ex : 1.bmp(X) 1(O))\n \t2.use only English and numbers\n");
+	fflush(stdout);
+	fgets(temp, sizeof(temp), stdin);
+	if ((p = strchr(temp, '\n')) != NULL) {
+		*p = '\0';
+	}
+	size_t len = strlen(temp);
+	char* input = malloc (len + 5);
+	strcpy(input, temp);
+	input[len] = '.';
+	input[len + 1] = 'b';
+	input[len + 2] = 'm';
+	input[len + 3] = 'p';
+	input[len + 4] = '\0';
+
+	//fflush(stdout);
+	return input;
+}
 
 int main() {
-	const char* inputFileName1 = "1.bmp";
-	const char* inputFileName2 = "2.bmp";
-	const char* inputFileName3 = "3.bmp";
-	const char* inputFileName4 = "4.bmp";
-	const char* outputFileName = "result.bmp";
+	const char* inputFileName1 = SetFileName("first");
+	const char* inputFileName2 = SetFileName("second");
+	const char* inputFileName3 = SetFileName("third");
+	const char* inputFileName4 = SetFileName("fourth");
+	const char* outputFileName = SetFileName("output");
 
 	MergeFourBitmapFile(inputFileName1, inputFileName2, inputFileName3, inputFileName4,
 		outputFileName);
